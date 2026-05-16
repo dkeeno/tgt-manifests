@@ -1,0 +1,3 @@
+kustomize:
+  images:
+  - online-shop=784916389752.dkr.ecr.us-east-1.amazonaws.com/tgt-images@sha256:67406f8c86b934a37cf5a6923447672a70b603fa4b5cb343d9b839b3b5125d48

@@ -1,0 +1,87 @@
+# =============================================================================
+# deployment.yaml — art-gallery app workload (Kustomize base)
+# =============================================================================
+#
+# Image reference is intentionally a PLACEHOLDER: just the bare name
+# `art-gallery`. Kustomize's `images:` field in each overlay rewrites this
+# to the real ECR path + the per-commit tag (or digest, with IU's digest
+# strategy).
+#
+# Bump flow (per art-gallery CI commit on main):
+#   1. art-gallery CI builds + pushes to ECR tgt-images repo with two tags:
+#      art-gallery-<SHORT_SHA> + art-gallery-latest
+#   2. Image Updater runs on a 2-min interval, sees a new digest behind the
+#      `art-gallery-latest` tag, pins it in overlays/dev/.argocd-source-
+#      art-gallery.yaml, and pushes the commit straight to tgt-manifests main.
+#   3. ArgoCD's git poll (~30s) picks the commit up and rolls these pods.
+#
+# Probe path: /art-gallery/healthz — the Go app serves all routes under
+# the /art-gallery/ prefix to match the Ingress path. No URL rewrite —
+# the app is just aware of its prefix.
+#
+# Resource requests deliberately tiny. EKS Auto Mode's Karpenter will
+# provision instances large enough to honour them; smaller requests =
+# better bin-packing across the shared node pool.
+#
+# Mirrors online-shop/base/deployment.yaml; differences are app name and
+# probe path. See that file's header for the full pattern explanation.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: art-gallery
+  namespace: art-gallery
+  labels:
+    app: art-gallery
+    managed-by: argocd
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: art-gallery
+  template:
+    metadata:
+      labels:
+        app: art-gallery
+    spec:
+      containers:
+        - name: art-gallery
+          image: art-gallery
+          ports:
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          readinessProbe:
+            httpGet:
+              path: /art-gallery/healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /art-gallery/healthz
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            # Distroless 'nonroot' user is UID/GID 65532. Without the
+            # numeric UID here, the kubelet rejects the pod with
+            # "container has runAsNonRoot and image has non-numeric user
+            # (nonroot), cannot verify user is non-root" — k8s won't
+            # resolve the username at admission time. (HARD RULE from GCP:
+            # memory `distroless_needs_numeric_uid`.)
+            runAsUser: 65532
+            runAsGroup: 65532
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL

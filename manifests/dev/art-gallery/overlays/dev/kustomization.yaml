@@ -1,0 +1,26 @@
+# =============================================================================
+# overlays/dev/kustomization.yaml — tgt-eks-01 (dev) overlay for art-gallery
+# =============================================================================
+# Pulls in the base + applies per-environment overrides. Single ECR repo
+# (HARD RULE feedback_single_ecr_repo): newName is the bare `tgt-images`
+# path; newTag carries the app-name prefix.
+#
+# Manual bump (until Image Updater ECR auth is wired):
+#   kustomize edit set image art-gallery=784916389752.dkr.ecr.us-east-1.amazonaws.com/tgt-images:art-gallery-<SHA>
+#   git commit -am "bump art-gallery to <SHA>" && git push
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+images:
+  - name: art-gallery
+    newName: 784916389752.dkr.ecr.us-east-1.amazonaws.com/tgt-images
+    # `<app>-latest` is mutable; CI re-points it on every push. Image
+    # Updater's digest strategy watches THIS tag and pins its digest in
+    # .argocd-source-art-gallery.yaml. Each CI push → digest changes →
+    # IU bumps the pin → ArgoCD syncs → pods roll. Hands-off, immune to
+    # SHA-tag sort-order quirks.
+    newTag: art-gallery-latest

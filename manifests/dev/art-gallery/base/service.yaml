@@ -1,0 +1,27 @@
+# =============================================================================
+# service.yaml — internal Service fronting art-gallery pods
+# =============================================================================
+#
+# ClusterIP only — external traffic enters through the SHARED internal ALB
+# provisioned by the per-app Ingress, routed to this Service.
+# Service port 80 → pod port 8080.
+#
+# Identical to online-shop/base/service.yaml except for the app name.
+# Both apps land on ONE shared ALB — see ingress.yaml's group.name.
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: art-gallery
+  namespace: art-gallery
+  labels:
+    app: art-gallery
+spec:
+  type: ClusterIP
+  selector:
+    app: art-gallery
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+      protocol: TCP

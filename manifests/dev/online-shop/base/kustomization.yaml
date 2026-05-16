@@ -1,0 +1,17 @@
+# =============================================================================
+# base/kustomization.yaml — environment-agnostic Kustomize base for online-shop
+# =============================================================================
+#
+# Lists every resource that's identical across environments. Image identity
+# (registry path + tag) is intentionally NOT here — it lives in the
+# overlay's `images:` field so per-env / per-commit overrides are a one-
+# liner that doesn't disturb the base.
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml

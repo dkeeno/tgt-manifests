@@ -1,0 +1,14 @@
+# =============================================================================
+# namespace.yaml — online-shop namespace
+# =============================================================================
+# AppSet's syncOptions also ensures CreateNamespace=true on first apply,
+# but having an explicit Namespace resource makes the manifest portable
+# (works under any kustomize build / kubectl apply context).
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: online-shop
+  labels:
+    app: online-shop
+    managed-by: argocd

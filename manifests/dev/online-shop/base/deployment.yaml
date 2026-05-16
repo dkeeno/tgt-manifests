@@ -1,0 +1,86 @@
+# =============================================================================
+# deployment.yaml — online-shop app workload (Kustomize base)
+# =============================================================================
+#
+# Image reference is intentionally a PLACEHOLDER: just the bare name
+# `online-shop`. Kustomize's `images:` field in each overlay rewrites this
+# to the real ECR path + the per-commit tag.
+#
+# Bump flow (per online-shop CI commit on main):
+#   1. online-shop CI builds + pushes the image to ECR with two tags:
+#      <SHORT_SHA> + latest
+#   2. Image Updater (when configured) runs the equivalent of
+#      `kustomize edit set image online-shop=<account>.dkr.ecr.us-east-1.amazonaws.com/tgt-images/online-shop:<SHORT_SHA>`
+#      against overlays/dev/kustomization.yaml — only that one file changes.
+#   3. The bump is committed straight to tgt-manifests main by IU.
+#   4. ArgoCD's git poll (~30s) picks it up and rolls the pods.
+#
+# Until Image Updater is wired with ECR auth (phase 2.5), bumps are MANUAL —
+# see header of argocd-apps/applicationset.yaml for the manual command.
+#
+# Probe path: /shop/healthz — the app serves all routes under the /shop/
+# prefix to match the Ingress path. No URL rewrite — the app is just
+# aware of its prefix.
+#
+# Resource requests deliberately tiny. Auto Mode's NodeClass / Karpenter
+# will provision instances large enough to honour them; smaller requests
+# = better bin-packing.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: online-shop
+  namespace: online-shop
+  labels:
+    app: online-shop
+    managed-by: argocd
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: online-shop
+  template:
+    metadata:
+      labels:
+        app: online-shop
+    spec:
+      containers:
+        - name: online-shop
+          image: online-shop
+          ports:
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          readinessProbe:
+            httpGet:
+              path: /shop/healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /shop/healthz
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            # Distroless 'nonroot' user is UID/GID 65532. Without the
+            # numeric UID here, the kubelet rejects the pod with
+            # "container has runAsNonRoot and image has non-numeric user
+            # (nonroot), cannot verify user is non-root" — k8s won't
+            # resolve the username at admission time. (HARD RULE from GCP.)
+            runAsUser: 65532
+            runAsGroup: 65532
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
