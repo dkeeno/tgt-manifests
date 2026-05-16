@@ -1,0 +1,36 @@
+# =============================================================================
+# overlays/dev/kustomization.yaml — tgt-eks-01 (dev) overlay for online-shop
+# =============================================================================
+#
+# Pulls in the base + applies per-environment overrides. Today the only
+# override is the image identity. For future staging/prod overlays you'd
+# add patches for replicas, resources, ingress hostnames, NetworkPolicies.
+#
+# This is the file Image Updater mutates on every image push (when ECR
+# auth is wired in phase 2.5). On detecting a new tag in ECR matching
+# the AppSet's allow-tags regex (^[a-f0-9]{8}$), Image Updater:
+#   1. Clones this repo
+#   2. Runs `kustomize edit set image online-shop=...:<SHA>`
+#   3. Commits "build: automatic update of online-shop"
+#   4. Pushes to main
+# ArgoCD's git poll picks up the new commit and rolls pods.
+#
+# UNTIL Image Updater is wired with ECR auth, manual bump:
+#   kustomize edit set image online-shop=784916389752.dkr.ecr.us-east-1.amazonaws.com/tgt-images/online-shop:<SHA>
+#   git commit -am "bump online-shop to <SHA>" && git push
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+images:
+  - name: online-shop
+    newName: 784916389752.dkr.ecr.us-east-1.amazonaws.com/tgt-images
+    # `<app>-latest` is mutable; CI re-points it on every push. Image
+    # Updater's digest strategy watches THIS tag and pins its digest in
+    # .argocd-source-online-shop.yaml. Each CI push → digest changes →
+    # IU bumps the pin → ArgoCD syncs → pods roll. Hands-off, immune to
+    # SHA-tag sort-order quirks.
+    newTag: online-shop-latest

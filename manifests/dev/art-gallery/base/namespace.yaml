@@ -1,0 +1,19 @@
+# =============================================================================
+# namespace.yaml — art-gallery namespace
+# =============================================================================
+#
+# AppSet's syncOptions also ensures CreateNamespace=true on first apply,
+# but having an explicit Namespace resource makes the manifest portable
+# (works under any kustomize build / kubectl apply context).
+#
+# Identical shape to online-shop/base/namespace.yaml — only the name and
+# `app:` label differ. Kept consistent so future per-app additions to the
+# namespace (NetworkPolicy, ResourceQuota, LimitRange) can be copy-pasted.
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: art-gallery
+  labels:
+    app: art-gallery
+    managed-by: argocd

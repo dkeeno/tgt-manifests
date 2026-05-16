@@ -1,0 +1,56 @@
+# =============================================================================
+# ingress.yaml — path-prefix routing /art-gallery/ → art-gallery Service
+# =============================================================================
+#
+# AWS-equivalent of the GCP HTTPRoute. Provisioned by the EKS Auto Mode
+# built-in ALB controller (IngressClass: alb, set up in cluster-iac).
+#
+# HARD RULE (memory `feedback_one_shared_alb`): all Ingresses on this
+# cluster share ONE internal ALB. Two enforcement layers cooperate:
+#   - The IngressClassParams `alb-shared` (set in tgt-cluster-iac/ingress.tf)
+#     pins scheme=internal + group.name=tgt-shared at the IngressClass.
+#   - The per-Ingress alb.ingress.kubernetes.io/group.name annotation here
+#     belt-and-suspenders matches it. (IngressClassParams alone is enough,
+#     but the annotation makes intent obvious to anyone reading just this
+#     manifest.)
+# Result: online-shop + art-gallery both bind to the SAME ALB
+# (`internal-k8s-tgtshared-...`), saving ~$16/mo per extra ALB avoided.
+#
+# alb.ingress.kubernetes.io/scheme: internal — ALB lives in the private
+# subnets, no internet exposure. Reachable from the bastion + any other
+# pod / VPC peer.
+#
+# target-type: ip — direct pod IP targeting via VPC CNI. Faster than
+# instance-mode (which routes through NodePort + iptables).
+#
+# healthcheck-path: /art-gallery/healthz — replaces the GCP HealthCheckPolicy
+# CRD. Without it, ALB probes "/" → 404 (app only serves under
+# /art-gallery/) → all targets unhealthy → no traffic.
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: art-gallery
+  namespace: art-gallery
+  labels:
+    app: art-gallery
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internal
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/group.name: tgt-shared
+    alb.ingress.kubernetes.io/healthcheck-path: /art-gallery/healthz
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /art-gallery
+            pathType: Prefix
+            backend:
+              service:
+                name: art-gallery
+                port:
+                  number: 80

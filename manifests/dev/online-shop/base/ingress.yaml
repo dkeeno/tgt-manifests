@@ -1,0 +1,50 @@
+# =============================================================================
+# ingress.yaml — path-prefix routing /shop/ → online-shop Service
+# =============================================================================
+#
+# AWS-equivalent of the GCP HTTPRoute. Provisioned by the EKS Auto Mode
+# built-in ALB controller (IngressClass: alb, set up in cluster-iac).
+#
+# Multiple apps share ONE internal ALB via the alb.ingress.kubernetes.io/
+# group.name annotation = "tgt-shared". Online-shop and art-gallery both
+# reference the same group, so the controller creates one ALB with two
+# rule sets (one per Ingress). Saves ~$16/mo per extra ALB.
+#
+# alb.ingress.kubernetes.io/scheme: internal — NLB / ALB lives in the
+# private subnets, no internet exposure. Reachable from the bastion +
+# any other pod / VPC peer.
+#
+# target-type: ip — direct pod IP targeting via VPC CNI. Faster than
+# instance-mode (which routes through NodePort + iptables).
+#
+# healthcheck-path: /shop/healthz — replaces the GCP HealthCheckPolicy
+# CRD. Without it, ALB probes "/" → 404 (app only serves under /shop/) →
+# all targets unhealthy → no traffic.
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: online-shop
+  namespace: online-shop
+  labels:
+    app: online-shop
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internal
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/group.name: tgt-shared
+    alb.ingress.kubernetes.io/healthcheck-path: /shop/healthz
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /shop
+            pathType: Prefix
+            backend:
+              service:
+                name: online-shop
+                port:
+                  number: 80

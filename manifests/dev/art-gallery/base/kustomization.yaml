@@ -1,0 +1,20 @@
+# =============================================================================
+# base/kustomization.yaml — environment-agnostic Kustomize base for art-gallery
+# =============================================================================
+#
+# Lists every resource that's identical across environments. Image identity
+# (registry path + tag/digest) is intentionally NOT here — it lives in the
+# overlay's `images:` field so per-env / per-commit overrides are a one-
+# liner that doesn't disturb the base.
+#
+# Image Updater (digest strategy) writes the digest pin to
+# overlays/dev/.argocd-source-art-gallery.yaml — also outside this base.
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
