@@ -1,3 +1,0 @@
-kustomize:
-  images:
-  - art-gallery=784916389752.dkr.ecr.us-east-1.amazonaws.com/tgt-images@sha256:082e1b90478a88d67362aa39b39e4e377a273e7dd2959bf8d9ac55b74ff55aab
